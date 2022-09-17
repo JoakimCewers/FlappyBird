@@ -13,9 +13,6 @@ CYAN=(0,255,255)
 HOLEWIDTH = 200
 PIPEAMOUNT = 3
 
-
-
-
 class Bird():
 
     def __init__(self,x,y) -> None:
@@ -23,15 +20,18 @@ class Bird():
         self.y = y
         self.vel = 0
         self.acc = +0.1
+        self.radius = 20
 
     def draw(self):
         self.updatePos()
-        pygame.draw.circle(WIN,BLACK,(self.x,self.y),20)
+        pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
 
     def updatePos(self):
         
         self.y += self.vel
         self.vel += self.acc
+        
+    
 
 
 class PipeCollection():
@@ -39,12 +39,19 @@ class PipeCollection():
     def __init__(self) -> None:
         self.collection = []
 
-    def update(self):
+    def update(self,bird):
         for pipe in self.collection:
             pipe.drawPipe()
+            pipe.checkColision(bird)
 
     def addPipe(self,newPipe):
         self.collection.append(newPipe)
+
+    def checkColision(self,bird):
+        for pipe in self.collection:
+            pipe.checkColision()
+        
+
 
 class Pipes():
 
@@ -59,18 +66,23 @@ class Pipes():
 
     def drawPipe(self):
         self.movePipe()
-        pygame.draw.rect(WIN,self.color,(self.x,0,100,HEIGHT))
-        self.drawHole()
+        pygame.draw.rect(WIN,self.color,(self.x,0,self.width,self.offest-HOLEWIDTH/2))
+        pygame.draw.rect(WIN,self.color,(self.x,self.offest+HOLEWIDTH/2,self.width,HEIGHT))
         
-    def drawHole(self):
-        pygame.draw.rect(WIN,CYAN,(self.x,self.offest-HOLEWIDTH/2,self.width,HOLEWIDTH))
-
     def movePipe(self):
         self.x -= self.speed
         if self.x < 0 - self.width:
             self.x = WIDTH
             self.changeHolePos()
             self.changeColor()
+
+    def checkColision(self,bird):
+
+        if bird.x >= self.x and bird.x <= self.x + self.width:
+        
+            if bird.y - bird.radius <= self.offest-HOLEWIDTH/2 or bird.y + bird.radius >= self.offest+HOLEWIDTH/2:
+                print(" U DEAD")
+
 
     def changeHolePos(self):
         self.offest = random.randint(200,HEIGHT-200)
@@ -81,8 +93,8 @@ class Pipes():
 
 def drawWindow():
     WIN.fill(CYAN)
-    
-    
+
+
     
 def main():
     
@@ -107,7 +119,7 @@ def main():
                 run = False
 
         drawWindow()
-        collection.update()
+        collection.update(player)
         
         player.draw()
         pygame.display.update()
@@ -119,8 +131,6 @@ def main():
 def mousePos():
     pos = pygame.mouse.get_pos()
     return pos
-
-
 
 
 
