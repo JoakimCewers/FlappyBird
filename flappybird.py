@@ -32,7 +32,6 @@ class Bird():
     def updatePos(self):
         self.y += self.vel
         self.vel += self.acc
-            
 
 class PipeCollection():
 
@@ -52,8 +51,7 @@ class PipeCollection():
     def checkColision(self,bird):
         for pipe in self.collection:
             pipe.checkColision()
-            
-        
+                   
 class Pipes():
 
     def __init__(self,x) -> None:
