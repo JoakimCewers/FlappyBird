@@ -14,6 +14,7 @@ WHITE = (255,255,255)
 CYAN=(0,255,255)
 HOLEWIDTH = 200
 PIPEAMOUNT = 3
+img_player = pygame.image.load('./images/bird.png')
 
 class Bird():
 
@@ -27,12 +28,12 @@ class Bird():
 
     def draw(self):
         self.updatePos()
+        WIN.blit(img_player,(self.x-self.radius-60,self.y-self.radius))
         pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
 
     def updatePos(self):
         self.y += self.vel
         self.vel += self.acc
-            
 
 class PipeCollection():
 
@@ -53,8 +54,11 @@ class PipeCollection():
         for pipe in self.collection:
             pipe.checkColision()
             
-        
-class Pipes():
+            
+            
+                
+            
+class Pipe():
 
     def __init__(self,x) -> None:
         self.offest = 0
@@ -78,13 +82,11 @@ class Pipes():
             self.changeColor()
 
     def checkColision(self,bird):
-
         if bird.x >= self.x and bird.x <= self.x + self.width:
         
             if bird.y - bird.radius <= self.offest-HOLEWIDTH/2 or bird.y + bird.radius >= self.offest+HOLEWIDTH/2:
                 print(" U DEAD")
                 bird.alive = False
-
 
     def changeHolePos(self):
         self.offest = random.randint(200,HEIGHT-200)
@@ -108,34 +110,52 @@ def mousePos():
     pos = pygame.mouse.get_pos()
     return pos
 
+def updateScore(bird,pipeCollection):
+    for pipe in pipeCollection.collection:
+        if pipe.x == (bird.x - bird.radius):
+            return 1
+    return 0
+            
+        
 
 def mainMenu():
     clock = pygame.time.Clock()
     run = True
     click = False
+    returnButton = False
+    high_score = 0
     while run:
         clock.tick(FPS)
         WIN.fill((CYAN))                                                # background color
         draw_text('Main menu','Corbel',60,BLACK,WIN,WIDTH/2-190,100)    # menu text
-
+        
         gameButton = pygame.Rect(WIDTH/2-200,HEIGHT/2-100,300,100)         # created a rectangle
         pygame.draw.rect(WIN,WHITE,gameButton)                          # draws rect
         draw_text('Play','Corbel',60,BLACK,WIN,WIDTH/2-100,HEIGHT/2-75)
-        
-        if gameButton.collidepoint(mousePos()): # if mouse is on button
+        draw_text('High score = ' + str(high_score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
+        print(returnButton)
+        if gameButton.collidepoint(mousePos()) or returnButton:# if mouse is on button or enter button
+            returnButton = False
             if click:
-                gameLoop()
-        
-        click = False
+                click = False
+                score = gameLoop()
+                if score > high_score:
+                    high_score = score
+                    print(high_score)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                     run = False
+                    
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     run = False
+                    
+                if event.key == pygame.K_RETURN:
+                    click = True
+                    returnButton = True
+                    
             if event.type == pygame.MOUSEBUTTONDOWN:
                 click = True
-
         pygame.display.update()
     pygame.quit()
 
@@ -143,17 +163,18 @@ def gameLoop(): # main game loop
    
     player = Bird(100,HEIGHT/2) # initialise the player and pipes
     collection = PipeCollection()
-
+    score = 0
     for i in range(PIPEAMOUNT): # adds amount of pipes
-        pipe = Pipes(WIDTH-i*WIDTH/PIPEAMOUNT)
+        pipe = Pipe(WIDTH-i*WIDTH/PIPEAMOUNT)
         collection.addPipe(pipe)
 
-    clock = pygame.time.Clock()     #starts clock
+    clock = pygame.time.Clock()#starts clock
+    
     run = True
     while run:
+        #print(clock.get_time())
         clock.tick(FPS)
         for event in pygame.event.get():
-            
             if event.type == pygame.MOUSEBUTTONDOWN:    #if mouse clicked
                 if player.alive:
                     player.vel = -4
@@ -162,19 +183,22 @@ def gameLoop(): # main game loop
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    if player.alive:
+                        player.vel = -4
                 if event.key == pygame.K_ESCAPE:
                     run = False
         
-        if player.alive == False:   # go to death menu
-            pass
+        if player.alive == False:   # go to death menu (not impelented)
+            return score
+        else:
+            score += updateScore(player,collection)
+            print(score)
         drawWindow()
         collection.update(player)
         player.draw()
         pygame.display.update()
         
-    
-
-
 if __name__ == "__main__":
     
     mainMenu()
