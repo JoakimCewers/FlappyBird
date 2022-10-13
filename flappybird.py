@@ -5,7 +5,7 @@ import random
 
 pygame.init()
 
-WIDTH,HEIGHT = 1800,1000    
+WIDTH,HEIGHT = 1800,1000
 RADIUS = 50
 FPS = 120
 WIN = pygame.display.set_mode((WIDTH,HEIGHT))
@@ -53,12 +53,8 @@ class PipeCollection():
     def checkColision(self,bird):
         for pipe in self.collection:
             pipe.checkColision()
-            
-            
-            
-                
-            
-class Pipe():
+
+class Pipes():
 
     def __init__(self,x) -> None:
         self.offest = 0
@@ -73,7 +69,7 @@ class Pipe():
         self.movePipe()
         pygame.draw.rect(WIN,self.color,(self.x,0,self.width,self.offest-HOLEWIDTH/2))
         pygame.draw.rect(WIN,self.color,(self.x,self.offest+HOLEWIDTH/2,self.width,HEIGHT))
-        
+
     def movePipe(self):
         self.x -= self.speed
         if self.x < 0 - self.width:
@@ -83,7 +79,7 @@ class Pipe():
 
     def checkColision(self,bird):
         if bird.x >= self.x and bird.x <= self.x + self.width:
-        
+
             if bird.y - bird.radius <= self.offest-HOLEWIDTH/2 or bird.y + bird.radius >= self.offest+HOLEWIDTH/2:
                 print(" U DEAD")
                 bird.alive = False
@@ -115,8 +111,8 @@ def updateScore(bird,pipeCollection):
         if pipe.x == (bird.x - bird.radius):
             return 1
     return 0
-            
-        
+
+
 
 def mainMenu():
     clock = pygame.time.Clock()
@@ -128,7 +124,7 @@ def mainMenu():
         clock.tick(FPS)
         WIN.fill((CYAN))                                                # background color
         draw_text('Main menu','Corbel',60,BLACK,WIN,WIDTH/2-190,100)    # menu text
-        
+
         gameButton = pygame.Rect(WIDTH/2-200,HEIGHT/2-100,300,100)         # created a rectangle
         pygame.draw.rect(WIN,WHITE,gameButton)                          # draws rect
         draw_text('Play','Corbel',60,BLACK,WIN,WIDTH/2-100,HEIGHT/2-75)
@@ -145,22 +141,22 @@ def mainMenu():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                     run = False
-                    
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     run = False
-                    
+
                 if event.key == pygame.K_RETURN:
                     click = True
                     returnButton = True
-                    
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 click = True
         pygame.display.update()
     pygame.quit()
 
 def gameLoop(): # main game loop
-   
+
     player = Bird(100,HEIGHT/2) # initialise the player and pipes
     collection = PipeCollection()
     score = 0
@@ -169,7 +165,7 @@ def gameLoop(): # main game loop
         collection.addPipe(pipe)
 
     clock = pygame.time.Clock()#starts clock
-    
+
     run = True
     while run:
         #print(clock.get_time())
@@ -179,7 +175,7 @@ def gameLoop(): # main game loop
                 if player.alive:
                     player.vel = -4
 
-            
+
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
@@ -188,7 +184,7 @@ def gameLoop(): # main game loop
                         player.vel = -4
                 if event.key == pygame.K_ESCAPE:
                     run = False
-        
+
         if player.alive == False:   # go to death menu (not impelented)
             return score
         else:
@@ -198,7 +194,7 @@ def gameLoop(): # main game loop
         collection.update(player)
         player.draw()
         pygame.display.update()
-        
+
 if __name__ == "__main__":
-    
+
     mainMenu()
