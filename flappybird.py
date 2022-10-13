@@ -1,7 +1,11 @@
+from audioop import reverse
 from pydoc import cli
+from turtle import distance
 import pygame
 import math
 import random
+from geneticNet import Organism,Ecosystem
+import numpy as np
 
 pygame.init()
 
@@ -11,10 +15,12 @@ FPS = 120
 WIN = pygame.display.set_mode((WIDTH,HEIGHT))
 BLACK = (0,0,0)
 WHITE = (255,255,255)
+RED = (0,0,255)
 CYAN=(0,255,255)
 HOLEWIDTH = 200
 PIPEAMOUNT = 3
-img_player = pygame.image.load('./images/bird.png')
+img_player = pygame.image.load('./images/Flappy.png')
+img_pipe = pygame.image.load('./images/pipeimage.png')
 
 class Bird():
 
@@ -23,18 +29,28 @@ class Bird():
         self.y = y
         self.vel = 0
         self.acc = +0.1
-        self.radius = 20
+        self.radius = 18
         self.alive = True
+        self.ai = None
 
     def draw(self):
         self.updatePos()
-        WIN.blit(img_player,(self.x-self.radius-60,self.y-self.radius))
-        pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
+        #pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
+        WIN.blit(img_player,(self.x-self.radius-57,self.y-self.radius-35))
+        
 
     def updatePos(self):
         self.y += self.vel
         self.vel += self.acc
 
+class Birds():
+    def __init__(self) -> None:
+        self.collection = []
+    
+    def update(self):
+        for player in self.collection:
+            if player.alive:
+                    player.vel = -4
 class PipeCollection():
 
     def __init__(self) -> None:
@@ -53,15 +69,11 @@ class PipeCollection():
     def checkColision(self,bird):
         for pipe in self.collection:
             pipe.checkColision()
-            
-            
-            
-                
-            
+        
 class Pipe():
 
     def __init__(self,x) -> None:
-        self.offest = 0
+        self.holepos = 0
         self.x = x
         self.width = 100
         self.color = BLACK
@@ -71,8 +83,10 @@ class Pipe():
 
     def drawPipe(self):
         self.movePipe()
-        pygame.draw.rect(WIN,self.color,(self.x,0,self.width,self.offest-HOLEWIDTH/2))
-        pygame.draw.rect(WIN,self.color,(self.x,self.offest+HOLEWIDTH/2,self.width,HEIGHT))
+        pygame.draw.rect(WIN,self.color,(self.x,0,self.width,self.holepos-HOLEWIDTH/2))
+        pygame.draw.rect(WIN,self.color,(self.x,self.holepos+HOLEWIDTH/2,self.width,HEIGHT))
+        WIN.blit(img_pipe,(self.x,0,self.width,self.holepos-HOLEWIDTH/2))
+        #WIN.blit(img_pipe,(self.x,self.holepos+HOLEWIDTH/2,self.width,HEIGHT))
         
     def movePipe(self):
         self.x -= self.speed
@@ -84,12 +98,14 @@ class Pipe():
     def checkColision(self,bird):
         if bird.x >= self.x and bird.x <= self.x + self.width:
         
-            if bird.y - bird.radius <= self.offest-HOLEWIDTH/2 or bird.y + bird.radius >= self.offest+HOLEWIDTH/2:
-                print(" U DEAD")
+            if bird.y - bird.radius <= self.holepos-HOLEWIDTH/2 or bird.y + bird.radius >= self.holepos+HOLEWIDTH/2:
+                #print(" U DEAD")
                 bird.alive = False
+        if bird.y < 0 or bird.y > HEIGHT:
+            bird.alive = False
 
     def changeHolePos(self):
-        self.offest = random.randint(200,HEIGHT-200)
+        self.holepos = random.randint(200,HEIGHT-200)
 
     def changeColor(self):
         self.color = (random.randint(200,255),random.randint(0,255),random.randint(0,255))
@@ -112,11 +128,35 @@ def mousePos():
 
 def updateScore(bird,pipeCollection):
     for pipe in pipeCollection.collection:
-        if pipe.x == (bird.x - bird.radius):
+        if pipe.x == (bird.x - bird.radius+3):
             return 1
     return 0
             
+
+def innitNet(bird):
+    bird.ai = Organism([2,4,4,1],output='sigmoid')
+    bird.ai.mutate()
+    
+def predict(bird,pipeCollection):
+    if bird.alive:
+        pipes = pipeCollection.collection
+        pipes.sort(key=lambda x: x.x)
+        closestPipe = pipes[0]
+        if closestPipe.x - bird.x < 0:
+            closestPipe = pipes[1]
+
+        distanceToPipe = closestPipe.x - bird.x
+        normDTP = distanceToPipe/700
+        #print(distanceToPipe/700)
         
+        distanceToHole = closestPipe.holepos - bird.y + HEIGHT/2
+        normDTH = distanceToHole/HEIGHT
+        X = np.array([[normDTH,normDTP]])
+        #X = X.transpose()
+
+        return bird.ai.predict(X)
+        #print(distanceToHole/HEIGHT)
+        #np.array()
 
 def mainMenu():
     clock = pygame.time.Clock()
@@ -128,14 +168,25 @@ def mainMenu():
         clock.tick(FPS)
         WIN.fill((CYAN))                                                # background color
         draw_text('Main menu','Corbel',60,BLACK,WIN,WIDTH/2-190,100)    # menu text
-        
         gameButton = pygame.Rect(WIDTH/2-200,HEIGHT/2-100,300,100)         # created a rectangle
-        pygame.draw.rect(WIN,WHITE,gameButton)                          # draws rect
+
+        gameButton2 = pygame.Rect(WIDTH/2-200,HEIGHT/2+35,300,100) 
+
+        pygame.draw.rect(WIN,WHITE,gameButton)                   # draws rect
+        pygame.draw.rect(WIN,WHITE,gameButton2)    
         draw_text('Play','Corbel',60,BLACK,WIN,WIDTH/2-100,HEIGHT/2-75)
+        draw_text('Play Ai','Corbel',60,BLACK,WIN,WIDTH/2-130,HEIGHT/2+50)
         draw_text('High score = ' + str(high_score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
-        print(returnButton)
         if gameButton.collidepoint(mousePos()) or returnButton:# if mouse is on button or enter button
             returnButton = False
+            if click:
+                click = False
+                score = gameLoop()
+                if score > high_score:
+                    high_score = score
+                    print(high_score)
+
+        if gameButton2.collidepoint(mousePos()):# if mouse is on button or enter button
             if click:
                 click = False
                 score = gameLoop()
@@ -162,24 +213,27 @@ def mainMenu():
 def gameLoop(): # main game loop
    
     player = Bird(100,HEIGHT/2) # initialise the player and pipes
+    ai = Bird(100,HEIGHT/2)
+    innitNet(player)
     collection = PipeCollection()
     score = 0
     for i in range(PIPEAMOUNT): # adds amount of pipes
-        pipe = Pipe(WIDTH-i*WIDTH/PIPEAMOUNT)
+        pipe = Pipe(WIDTH+i*WIDTH/PIPEAMOUNT)
         collection.addPipe(pipe)
 
     clock = pygame.time.Clock()#starts clock
     
     run = True
     while run:
-        #print(clock.get_time())
         clock.tick(FPS)
+        print(predict(player,collection))
+        
+
+        ## checks all pygame actions (for the player movement)
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:    #if mouse clicked
                 if player.alive:
                     player.vel = -4
-
-            
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
@@ -188,16 +242,16 @@ def gameLoop(): # main game loop
                         player.vel = -4
                 if event.key == pygame.K_ESCAPE:
                     run = False
-        
         if player.alive == False:   # go to death menu (not impelented)
             return score
         else:
             score += updateScore(player,collection)
-            print(score)
         drawWindow()
         collection.update(player)
         player.draw()
+        draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
         pygame.display.update()
+        
         
 if __name__ == "__main__":
     
