@@ -1,4 +1,5 @@
 from audioop import reverse
+from ensurepip import bootstrap
 from pydoc import cli
 from turtle import distance
 import pygame
@@ -32,43 +33,84 @@ class Bird():
         self.radius = 18
         self.alive = True
         self.ai = None
-
+        self.distance = 0
+        self.show = True
     def draw(self):
-        self.updatePos()
         #pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
         WIN.blit(img_player,(self.x-self.radius-57,self.y-self.radius-35))
         
-
     def updatePos(self):
         self.y += self.vel
         self.vel += self.acc
-
-class Birds():
-    def __init__(self) -> None:
-        self.collection = []
     
-    def update(self):
-        for player in self.collection:
-            if player.alive:
-                    player.vel = -4
+    def reset(self):
+        self.x = 100
+        self.y = HEIGHT/2
+        self.vel = 0
+        self.alive = True
+        self.distance = 0
+
+class Nets():
+    def __init__(self,size) -> None:
+        self.collection = []
+        self.size = self.innitNet(size)
+
+    def innitNet(self,size):
+        for i in range(size):
+            bird = Bird(100,HEIGHT/2)
+            bird.ai = Organism([2,4,4,2],output='softmax')
+            bird.ai.mutate()
+            self.collection.append(bird)
+    def update(self,pipeCollection):
+        end = 0
+        for bird in self.collection:
+            if bird.alive:
+                bird.distance += 1
+                prediction = predict(bird,pipeCollection)
+                
+                if prediction[0][0] < prediction[0][1]:
+                    bird.vel = -4
+                bird.updatePos()
+                end +=1
+                if bird.show:
+                    bird.draw()
+        if end == 0:
+            return 1
+        else: 
+            return 0
+def predict(bird,pipeCollection):
+    pipes = pipeCollection.collection
+    pipes.sort(key=lambda x: x.x)
+    closestPipe = pipes[0]
+    if closestPipe.x - bird.x < 0:
+        closestPipe = pipes[1]
+
+    distanceToPipe = closestPipe.x - bird.x
+    normDTP = distanceToPipe/700
+    if normDTP > 1:
+        normDTP = 1
+    distanceToHole = closestPipe.holepos - bird.y + HEIGHT/2
+    normDTH = distanceToHole/HEIGHT
+    X = np.array([[normDTH,normDTP]])
+    print(X)
+    return bird.ai.predict(X)
+
 class PipeCollection():
 
     def __init__(self) -> None:
         self.collection = []
+        
 
-    def update(self,bird):
+    def update(self,birds):
         for pipe in self.collection:
-            if bird.alive == False:
-                pipe.speed = -1
-            pipe.checkColision(bird)
+
+            #pipe.speed = -1
+            pipe.checkColision(birds)
             pipe.drawPipe()
 
     def addPipe(self,newPipe):
         self.collection.append(newPipe)
 
-    def checkColision(self,bird):
-        for pipe in self.collection:
-            pipe.checkColision()
         
 class Pipe():
 
@@ -85,7 +127,7 @@ class Pipe():
         self.movePipe()
         pygame.draw.rect(WIN,self.color,(self.x,0,self.width,self.holepos-HOLEWIDTH/2))
         pygame.draw.rect(WIN,self.color,(self.x,self.holepos+HOLEWIDTH/2,self.width,HEIGHT))
-        WIN.blit(img_pipe,(self.x,0,self.width,self.holepos-HOLEWIDTH/2))
+        #WIN.blit(img_pipe,(self.x,0,self.width,self.holepos-HOLEWIDTH/2))
         #WIN.blit(img_pipe,(self.x,self.holepos+HOLEWIDTH/2,self.width,HEIGHT))
         
     def movePipe(self):
@@ -95,17 +137,21 @@ class Pipe():
             self.changeHolePos()
             self.changeColor()
 
-    def checkColision(self,bird):
-        if bird.x >= self.x and bird.x <= self.x + self.width:
-        
-            if bird.y - bird.radius <= self.holepos-HOLEWIDTH/2 or bird.y + bird.radius >= self.holepos+HOLEWIDTH/2:
-                #print(" U DEAD")
+    def checkColision(self,birds):
+        for bird in birds:
+            if bird.x >= self.x and bird.x <= self.x + self.width:
+            
+                if bird.y - bird.radius <= self.holepos-HOLEWIDTH/2 or bird.y + bird.radius >= self.holepos+HOLEWIDTH/2:
+                    #print(" U DEAD")
+                    bird.alive = False
+            if bird.y < 0 or bird.y > HEIGHT:
                 bird.alive = False
-        if bird.y < 0 or bird.y > HEIGHT:
-            bird.alive = False
 
     def changeHolePos(self):
-        self.holepos = random.randint(200,HEIGHT-200)
+        self.holepos += 200
+        if self.holepos > HEIGHT-200:
+            self.holepos = 200
+        #self.holepos = random.randint(200,HEIGHT-200)
 
     def changeColor(self):
         self.color = (random.randint(200,255),random.randint(0,255),random.randint(0,255))
@@ -132,38 +178,13 @@ def updateScore(bird,pipeCollection):
             return 1
     return 0
             
-
-def innitNet(bird):
-    bird.ai = Organism([2,4,4,1],output='sigmoid')
-    bird.ai.mutate()
-    
-def predict(bird,pipeCollection):
-    if bird.alive:
-        pipes = pipeCollection.collection
-        pipes.sort(key=lambda x: x.x)
-        closestPipe = pipes[0]
-        if closestPipe.x - bird.x < 0:
-            closestPipe = pipes[1]
-
-        distanceToPipe = closestPipe.x - bird.x
-        normDTP = distanceToPipe/700
-        #print(distanceToPipe/700)
-        
-        distanceToHole = closestPipe.holepos - bird.y + HEIGHT/2
-        normDTH = distanceToHole/HEIGHT
-        X = np.array([[normDTH,normDTP]])
-        #X = X.transpose()
-
-        return bird.ai.predict(X)
-        #print(distanceToHole/HEIGHT)
-        #np.array()
-
 def mainMenu():
     clock = pygame.time.Clock()
     run = True
     click = False
     returnButton = False
     high_score = 0
+    bots = Nets(20)
     while run:
         clock.tick(FPS)
         WIN.fill((CYAN))                                                # background color
@@ -181,7 +202,7 @@ def mainMenu():
             returnButton = False
             if click:
                 click = False
-                score = gameLoop()
+                score = gameLoop(bots)
                 if score > high_score:
                     high_score = score
                     print(high_score)
@@ -189,10 +210,22 @@ def mainMenu():
         if gameButton2.collidepoint(mousePos()):# if mouse is on button or enter button
             if click:
                 click = False
-                score = gameLoop()
-                if score > high_score:
-                    high_score = score
-                    print(high_score)
+                gameLoop(bots)
+                bots.collection.sort(key=lambda x: x.distance,reverse=True)
+                best = bots.collection[0]
+                
+                bots.collection[0].show = True
+                for bird in bots.collection[1:]:
+                    #bird.show = False
+                    
+                    if bird.distance < best.distance:
+                        bird.ai.layers = best.ai.layers
+                        bird.ai.biases = best.ai.biases
+                    bird.ai.mutate(stdev=0.3)
+                    bird.reset()
+                bots.collection[0].reset()
+                
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                     run = False
@@ -210,15 +243,13 @@ def mainMenu():
         pygame.display.update()
     pygame.quit()
 
-def gameLoop(): # main game loop
+def gameLoop(bots): # main game loop
    
     player = Bird(100,HEIGHT/2) # initialise the player and pipes
-    ai = Bird(100,HEIGHT/2)
-    innitNet(player)
     collection = PipeCollection()
     score = 0
     for i in range(PIPEAMOUNT): # adds amount of pipes
-        pipe = Pipe(WIDTH+i*WIDTH/PIPEAMOUNT)
+        pipe = Pipe( WIDTH /2 + i*WIDTH/PIPEAMOUNT)
         collection.addPipe(pipe)
 
     clock = pygame.time.Clock()#starts clock
@@ -226,8 +257,6 @@ def gameLoop(): # main game loop
     run = True
     while run:
         clock.tick(FPS)
-        print(predict(player,collection))
-        
 
         ## checks all pygame actions (for the player movement)
         for event in pygame.event.get():
@@ -247,9 +276,11 @@ def gameLoop(): # main game loop
         else:
             score += updateScore(player,collection)
         drawWindow()
-        collection.update(player)
-        player.draw()
-        draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
+        collection.update(bots.collection)
+        end = bots.update(collection)
+        if end:
+            return
+        #draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
         pygame.display.update()
         
         
