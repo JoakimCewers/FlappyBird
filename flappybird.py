@@ -1,5 +1,6 @@
 from audioop import reverse
 from ensurepip import bootstrap
+from operator import index
 from pydoc import cli
 from turtle import distance
 import pygame
@@ -7,6 +8,7 @@ import math
 import random
 from geneticNet import Organism,Ecosystem
 import numpy as np
+import copy
 
 pygame.init()
 
@@ -34,10 +36,12 @@ class Bird():
         self.alive = True
         self.ai = None
         self.distance = 0
-        self.show = True
+        self.show = False
     def draw(self):
-        #pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
-        WIN.blit(img_player,(self.x-self.radius-57,self.y-self.radius-35))
+        if self.show == True:
+            WIN.blit(img_player,(self.x-self.radius-57,self.y-self.radius-35))
+        else:
+            pygame.draw.circle(WIN,BLACK,(self.x,self.y),self.radius)
         
     def updatePos(self):
         self.y += self.vel
@@ -58,7 +62,7 @@ class Nets():
     def innitNet(self,size):
         for i in range(size):
             bird = Bird(100,HEIGHT/2)
-            bird.ai = Organism([2,4,4,2],output='softmax')
+            bird.ai = Organism([2,8,8,2],output='softmax')
             bird.ai.mutate()
             self.collection.append(bird)
     def update(self,pipeCollection):
@@ -72,8 +76,8 @@ class Nets():
                     bird.vel = -4
                 bird.updatePos()
                 end +=1
-                if bird.show:
-                    bird.draw()
+                
+                bird.draw()
         if end == 0:
             return 1
         else: 
@@ -92,7 +96,7 @@ def predict(bird,pipeCollection):
     distanceToHole = closestPipe.holepos - bird.y + HEIGHT/2
     normDTH = distanceToHole/HEIGHT
     X = np.array([[normDTH,normDTP]])
-    print(X)
+    #print(X)
     return bird.ai.predict(X)
 
 class PipeCollection():
@@ -110,8 +114,7 @@ class PipeCollection():
 
     def addPipe(self,newPipe):
         self.collection.append(newPipe)
-
-        
+     
 class Pipe():
 
     def __init__(self,x) -> None:
@@ -148,10 +151,10 @@ class Pipe():
                 bird.alive = False
 
     def changeHolePos(self):
-        self.holepos += 200
-        if self.holepos > HEIGHT-200:
-            self.holepos = 200
-        #self.holepos = random.randint(200,HEIGHT-200)
+        # self.holepos += 200
+        # if self.holepos > HEIGHT-200:
+        #     self.holepos = 200
+        self.holepos = random.randint(200,HEIGHT-200)
 
     def changeColor(self):
         self.color = (random.randint(200,255),random.randint(0,255),random.randint(0,255))
@@ -184,7 +187,8 @@ def mainMenu():
     click = False
     returnButton = False
     high_score = 0
-    bots = Nets(20)
+    bots = Nets(100)
+    plays = 0
     while run:
         clock.tick(FPS)
         WIN.fill((CYAN))                                                # background color
@@ -210,22 +214,29 @@ def mainMenu():
         if gameButton2.collidepoint(mousePos()):# if mouse is on button or enter button
             if click:
                 click = False
-                gameLoop(bots)
-                bots.collection.sort(key=lambda x: x.distance,reverse=True)
-                best = bots.collection[0]
-                
-                bots.collection[0].show = True
+                plays += gameLoop(bots)
+                dist = 0
+                sdv = 0.03 
+                j = 0
+                bots.collection.sort(key=lambda x: x.distance,reverse=False)
+                # for i in range(len(bots.collection)):
+                #     bird = bots.collection[i]
+                #     if bird.distance > dist:
+                #         j = i
+                #         dist = bird.distance
+                                        
+                best = []
+                for j in range(10):
+                    best.append(bots.collection[j])
                 for bird in bots.collection[1:]:
-                    #bird.show = False
+                    bird.show = False
                     
                     if bird.distance < best.distance:
-                        bird.ai.layers = best.ai.layers
-                        bird.ai.biases = best.ai.biases
-                    bird.ai.mutate(stdev=0.3)
+                        bird.ai = copy.deepcopy(best.ai)
+                    bird.ai.mutate(stdev=sdv)
                     bird.reset()
-                bots.collection[0].reset()
-                
-
+                best.reset()
+                best.show = True
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                     run = False
@@ -233,7 +244,6 @@ def mainMenu():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     run = False
-                    
                 if event.key == pygame.K_RETURN:
                     click = True
                     returnButton = True
@@ -279,7 +289,7 @@ def gameLoop(bots): # main game loop
         collection.update(bots.collection)
         end = bots.update(collection)
         if end:
-            return
+            return 1 
         #draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
         pygame.display.update()
         
