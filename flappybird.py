@@ -37,6 +37,7 @@ class Bird():
         self.ai = None
         self.distance = 0
         self.show = False
+        self.score=0
     def draw(self):
         if self.show == True:
             WIN.blit(img_player,(self.x-self.radius-57,self.y-self.radius-35))
@@ -62,7 +63,7 @@ class Nets():
     def innitNet(self,size):
         for i in range(size):
             bird = Bird(100,HEIGHT/2)
-            bird.ai = Organism([2,8,8,2],output='softmax')
+            bird.ai = Organism([3,8,8,2],output='softmax')
             bird.ai.mutate()
             self.collection.append(bird)
     def update(self,pipeCollection):
@@ -71,7 +72,7 @@ class Nets():
             if bird.alive:
                 bird.distance += 1
                 prediction = predict(bird,pipeCollection)
-                
+                bird.score = updateScore(bird,pipeCollection)
                 if prediction[0][0] < prediction[0][1]:
                     bird.vel = -4
                 bird.updatePos()
@@ -86,16 +87,22 @@ def predict(bird,pipeCollection):
     pipes = pipeCollection.collection
     pipes.sort(key=lambda x: x.x)
     closestPipe = pipes[0]
+    closestPipe2 = pipes[1]
     if closestPipe.x - bird.x < 0:
         closestPipe = pipes[1]
+        closestPipe2 = pipes[2]
 
     distanceToPipe = closestPipe.x - bird.x
+    distanceToPipe2 = closestPipe2.x - bird.x
     normDTP = distanceToPipe/700
+    normDTP2 = distanceToPipe2/WIDTH
+    if normDTP2 > 1:
+        normDTP2 = 1
     if normDTP > 1:
         normDTP = 1
     distanceToHole = closestPipe.holepos - bird.y + HEIGHT/2
     normDTH = distanceToHole/HEIGHT
-    X = np.array([[normDTH,normDTP]])
+    X = np.array([[normDTH,normDTP,normDTP2]])
     #print(X)
     return bird.ai.predict(X)
 
@@ -205,38 +212,45 @@ def mainMenu():
         if gameButton.collidepoint(mousePos()) or returnButton:# if mouse is on button or enter button
             returnButton = False
             if click:
+                bestbot = Nets(0)
+                best.show = True
+                bestbot.collection.append(bots.collection[0])
                 click = False
-                score = gameLoop(bots)
+                score = gameLoop(bestbot)
+                best.reset()
                 if score > high_score:
                     high_score = score
                     print(high_score)
 
         if gameButton2.collidepoint(mousePos()):# if mouse is on button or enter button
             if click:
-                click = False
-                plays += gameLoop(bots)
-                dist = 0
-                sdv = 0.03 
-                j = 0
-                bots.collection.sort(key=lambda x: x.distance,reverse=False)
-                # for i in range(len(bots.collection)):
-                #     bird = bots.collection[i]
-                #     if bird.distance > dist:
-                #         j = i
-                #         dist = bird.distance
-                                        
-                best = []
-                for j in range(10):
-                    best.append(bots.collection[j])
-                for bird in bots.collection[1:]:
-                    bird.show = False
+                #click = False
+                while gameLoop(bots) == 0:
                     
-                    if bird.distance < best.distance:
-                        bird.ai = copy.deepcopy(best.ai)
-                    bird.ai.mutate(stdev=sdv)
-                    bird.reset()
-                best.reset()
-                best.show = True
+                    dist = 0
+                    sdv = 0.02 
+                    j = 0
+                    bots.collection.sort(key=lambda x: x.distance,reverse=False)
+                    
+                    # for i in range(len(bots.collection)):
+                    #     bird = bots.collection[i]
+                    #     if bird.distance > dist:
+                    #         j = i
+                    #         dist = bird.distance
+                                            
+                    
+                    best = bots.collection[-1]
+                    for bird in bots.collection[1:]:
+                        bird.show = False
+                        
+                        if bird.distance < best.distance:
+                            bird.ai = copy.deepcopy(best.ai)
+                        bird.ai.mutate(stdev=sdv)
+                        bird.reset()
+                    best.reset()
+                    best.show = True
+                click = False
+                
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                     run = False
@@ -289,11 +303,55 @@ def gameLoop(bots): # main game loop
         collection.update(bots.collection)
         end = bots.update(collection)
         if end:
-            return 1 
-        #draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
+            return 0
+        draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
         pygame.display.update()
         
+    return 1
+
+def gameLoop2(bots): # main game loop
+   
+    #player = Bird(100,HEIGHT/2) # initialise the player and pipes
+    player = bots.collection[0]
+    player.show = True
+    collection = PipeCollection()
+    score = 0
+    for i in range(PIPEAMOUNT): # adds amount of pipes
+        pipe = Pipe( WIDTH /2 + i*WIDTH/PIPEAMOUNT)
+        collection.addPipe(pipe)
+
+    clock = pygame.time.Clock()#starts clock
+    
+    run = True
+    while run:
+        clock.tick(FPS)
+
+        ## checks all pygame actions (for the player movement)
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:    #if mouse clicked
+                if player.alive:
+                    player.vel = -4
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    if player.alive:
+                        player.vel = -4
+                if event.key == pygame.K_ESCAPE:
+                    run = False
+        if player.alive == False:   # go to death menu (not impelented)
+            return score
+        else:
+            score += updateScore(player,collection)
+        drawWindow()
+        collection.update(bots.collection)
+        end = bots.update(collection)
+        if end:
+            return 0
+        draw_text('Score = ' + str(score),'Corbel',60,BLACK,WIN,WIDTH/2-200,HEIGHT/2+150)
+        pygame.display.update()
         
+    return 1
 if __name__ == "__main__":
     
     mainMenu()
